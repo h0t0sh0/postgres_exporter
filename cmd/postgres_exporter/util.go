@@ -17,6 +17,8 @@ import (
 	"fmt"
 	"math"
 	"net/url"
+	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -25,10 +27,8 @@ import (
 )
 
 func contains(a []string, x string) bool {
-	for _, n := range a {
-		if x == n {
-			return true
-		}
+	if slices.Contains(a, x) {
+		return true
 	}
 	return false
 }
@@ -176,18 +176,25 @@ func parseFingerprint(url string) (string, error) {
 		dsn = url
 	}
 
-	pairs := strings.Split(dsn, " ")
-	kv := make(map[string]string, len(pairs))
-	for _, pair := range pairs {
-		splitted := strings.SplitN(pair, "=", 2)
-		if len(splitted) != 2 {
-			return "", fmt.Errorf("malformed dsn %q", dsn)
+	re := regexp.MustCompile(`(\S+)=('([^']*)'|(\S+))`)
+	matches := re.FindAllStringSubmatch(dsn, -1)
+	kv := make(map[string]string)
+	for _, m := range matches {
+		key := m[1]
+		var value string
+		if m[3] != "" {
+			value = m[3]
+		} else {
+			value = m[4]
 		}
-		// Newer versions of pq.ParseURL quote values so trim them off if they exist
-		key := strings.Trim(splitted[0], "'\"")
-		value := strings.Trim(splitted[1], "'\"")
 		kv[key] = value
 	}
+
+	// 	// Newer versions of pq.ParseURL quote values so trim them off if they exist
+	// 	key := strings.Trim(splitted[0], "'\"")
+	// 	value := strings.Trim(splitted[1], "'\"")
+	// 	kv[key] = value
+	// }
 
 	var fingerprint string
 
